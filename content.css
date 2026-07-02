@@ -1,0 +1,247 @@
+/* Trigger button injected into GitHub's UI */
+#gh-rerun-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: inherit;
+  line-height: 20px;
+  cursor: pointer;
+  border: 1px solid var(--color-border-default, #d0d7de);
+  border-radius: 6px;
+  background: var(--color-canvas-default, #ffffff);
+  color: var(--color-fg-default, #1f2328);
+  white-space: nowrap;
+  margin-right: 8px;
+  vertical-align: middle;
+  transition: background 0.1s, border-color 0.1s;
+}
+
+#gh-rerun-btn:hover:not(:disabled) {
+  background: var(--color-canvas-subtle, #f6f8fa);
+  border-color: var(--color-border-default, #d0d7de);
+}
+
+#gh-rerun-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.gh-rerun-spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--color-border-default, #d0d7de);
+  border-top-color: var(--color-fg-muted, #656d76);
+  border-radius: 50%;
+  animation: gh-rerun-spin 0.6s linear infinite;
+}
+
+@keyframes gh-rerun-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Modal overlay */
+#gh-rerun-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.gh-rerun-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(31, 35, 40, 0.5);
+}
+
+.gh-rerun-dialog {
+  position: relative;
+  background: var(--color-canvas-default, #ffffff);
+  color: var(--color-fg-default, #1f2328);
+  border: 1px solid var(--color-border-default, #d0d7de);
+  border-radius: 12px;
+  padding: 24px;
+  width: 500px;
+  max-width: 92vw;
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: 0 8px 24px rgba(140, 149, 159, 0.2);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+  font-size: 14px;
+}
+
+.gh-rerun-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.gh-rerun-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-fg-default, #1f2328);
+}
+
+.gh-rerun-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-fg-muted, #656d76);
+  font-size: 16px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  line-height: 1;
+  font-family: inherit;
+}
+
+.gh-rerun-close:hover {
+  background: var(--color-canvas-subtle, #f6f8fa);
+  color: var(--color-fg-default, #1f2328);
+}
+
+.gh-rerun-ref {
+  margin: 0 0 16px;
+  font-size: 12px;
+  color: var(--color-fg-muted, #656d76);
+}
+
+.gh-rerun-ref code {
+  background: var(--color-canvas-subtle, #f6f8fa);
+  border: 1px solid var(--color-border-default, #d0d7de);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+
+.gh-rerun-notice {
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  background: var(--color-attention-subtle, #fff8c5);
+  border: 1px solid var(--color-attention-muted, #d4a72c);
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--color-fg-default, #1f2328);
+}
+
+.gh-rerun-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.gh-rerun-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.gh-rerun-field label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-fg-default, #1f2328);
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+
+.gh-rerun-field input {
+  padding: 7px 10px;
+  border: 1px solid var(--color-border-default, #d0d7de);
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+  background: var(--color-canvas-default, #ffffff);
+  color: var(--color-fg-default, #1f2328);
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.gh-rerun-field input:focus {
+  border-color: var(--color-accent-emphasis, #0969da);
+  box-shadow: 0 0 0 3px rgba(9, 105, 218, 0.12);
+}
+
+.gh-rerun-empty {
+  color: var(--color-fg-muted, #656d76);
+  font-size: 14px;
+  text-align: center;
+  padding: 20px 0;
+  margin: 0;
+}
+
+.gh-rerun-empty code {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 12px;
+  background: var(--color-canvas-subtle, #f6f8fa);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.gh-rerun-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.gh-rerun-cancel {
+  padding: 6px 16px;
+  border: 1px solid var(--color-border-default, #d0d7de);
+  border-radius: 6px;
+  background: var(--color-canvas-default, #ffffff);
+  color: var(--color-fg-default, #1f2328);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.1s;
+}
+
+.gh-rerun-cancel:hover {
+  background: var(--color-canvas-subtle, #f6f8fa);
+}
+
+.gh-rerun-confirm {
+  padding: 6px 16px;
+  border: 1px solid rgba(27, 31, 36, 0.15);
+  border-radius: 6px;
+  background: var(--color-success-emphasis, #1a7f37);
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.1s;
+}
+
+.gh-rerun-confirm:hover:not(:disabled) {
+  background: #1c8139;
+}
+
+.gh-rerun-confirm:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.gh-rerun-confirm.gh-rerun-success {
+  background: var(--color-success-emphasis, #1a7f37);
+}
+
+.gh-rerun-error {
+  margin-top: 12px;
+  padding: 10px 14px;
+  background: var(--color-danger-subtle, #fff0ee);
+  border: 1px solid var(--color-danger-muted, #ffaba8);
+  border-radius: 6px;
+  color: var(--color-danger-fg, #d1242f);
+  font-size: 13px;
+  margin-bottom: 0;
+}

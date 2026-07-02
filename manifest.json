@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "GitHub Actions: Re-run with Inputs",
+  "version": "1.0.0",
+  "description": "Re-run GitHub Actions workflows and modify the inputs before triggering a new run.",
+  "permissions": ["storage", "cookies"],
+  "host_permissions": [
+    "https://github.com/*",
+    "https://api.github.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://github.com/*/*/actions/runs/*"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "GitHub Actions: Re-run with Inputs"
+  }
+}
