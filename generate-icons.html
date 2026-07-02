@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Generate Extension Icons</title>
+  <style>
+    body { font-family: sans-serif; padding: 24px; background: #f6f8fa; }
+    h2 { color: #1f2328; }
+    .previews { display: flex; gap: 24px; align-items: flex-end; margin: 24px 0; }
+    .preview { text-align: center; }
+    .preview p { margin: 8px 0 0; font-size: 12px; color: #656d76; }
+    button {
+      padding: 8px 20px; background: #1a7f37; color: white;
+      border: none; border-radius: 6px; font-size: 14px;
+      cursor: pointer; font-family: inherit;
+    }
+    button:hover { background: #1c8139; }
+  </style>
+</head>
+<body>
+  <h2>Extension Icon Generator</h2>
+  <p>Click the button to generate and download all icon sizes.</p>
+
+  <div class="previews">
+    <div class="preview"><canvas id="c128" width="128" height="128"></canvas><p>128×128</p></div>
+    <div class="preview"><canvas id="c48"  width="48"  height="48" ></canvas><p>48×48</p></div>
+    <div class="preview"><canvas id="c16"  width="16"  height="16" ></canvas><p>16×16</p></div>
+  </div>
+
+  <button onclick="downloadAll()">Download all icons</button>
+
+  <script>
+    function drawIcon(canvas) {
+      const s = canvas.width;
+      const ctx = canvas.getContext('2d');
+      const cx = s / 2, cy = s / 2, r = s * 0.42;
+      const stroke = s * 0.12;
+      const arrow = s * 0.18;
+
+      // Background
+      ctx.fillStyle = '#24292f';
+      roundRect(ctx, 0, 0, s, s, s * 0.18);
+      ctx.fill();
+
+      // Circular arrow arc — top-right 270° arc
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, -Math.PI * 0.85, Math.PI * 0.5, false);
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = stroke;
+      ctx.lineCap = 'round';
+      ctx.stroke();
+
+      // Arrowhead at end of arc (bottom-right)
+      const endAngle = Math.PI * 0.5;
+      const ax = cx + r * Math.cos(endAngle);
+      const ay = cy + r * Math.sin(endAngle);
+      const tangentAngle = endAngle + Math.PI / 2;
+      drawArrowhead(ctx, ax, ay, tangentAngle, arrow, stroke * 0.9, '#ffffff');
+
+      // Green dot — top-right accent
+      const dotR = s * 0.13;
+      const dotX = cx + r * Math.cos(-Math.PI * 0.2);
+      const dotY = cy + r * Math.sin(-Math.PI * 0.2);
+      ctx.beginPath();
+      ctx.arc(dotX, dotY, dotR, 0, Math.PI * 2);
+      ctx.fillStyle = '#3fb950';
+      ctx.fill();
+    }
+
+    function roundRect(ctx, x, y, w, h, radius) {
+      ctx.beginPath();
+      ctx.moveTo(x + radius, y);
+      ctx.lineTo(x + w - radius, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + radius);
+      ctx.lineTo(x + w, y + h - radius);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h);
+      ctx.lineTo(x + radius, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - radius);
+      ctx.lineTo(x, y + radius);
+      ctx.quadraticCurveTo(x, y, x + radius, y);
+      ctx.closePath();
+    }
+
+    function drawArrowhead(ctx, x, y, angle, size, lineWidth, color) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(angle);
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(-size * 0.6, -size * 0.9);
+      ctx.lineTo( size * 0.6, -size * 0.9);
+      ctx.closePath();
+      ctx.fillStyle = color;
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function downloadAll() {
+      ['128', '48', '16'].forEach(size => {
+        const canvas = document.getElementById('c' + size);
+        const link = document.createElement('a');
+        link.download = `icon${size}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+      });
+    }
+
+    // Draw on load
+    ['c128', 'c48', 'c16'].forEach(id => drawIcon(document.getElementById(id)));
+  </script>
+</body>
+</html>
