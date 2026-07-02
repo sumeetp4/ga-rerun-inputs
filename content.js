@@ -148,14 +148,6 @@
     return inputs;
   }
 
-  // Mapping from shortened "Print inputs" log keys → actual input names
-  const PRINT_INPUTS_KEY_MAP = {
-    slack_channel:   'slack_channel_name',
-    carousell_build: 'carousell_build_name',
-    bstack_device:   'bstack_device_name',
-    bstack_os:       'bstack_os_version',
-  };
-
   function parseInputsFromPrintStep(logText) {
     const clean = logText.replace(/\d{4}-\d{2}-\d{2}T[\d:.]+Z\s*/g, '');
 
@@ -165,9 +157,7 @@
     for (const line of clean.split('\n')) {
       const m = line.match(/^(\w[\w_]*)\s{2,}:\s*(.*)$/);
       if (!m) continue;
-      const rawKey = m[1].trim();
-      const key = PRINT_INPUTS_KEY_MAP[rawKey] || rawKey;
-      inputs[key] = m[2].trim();
+      inputs[m[1].trim()] = m[2].trim();
     }
     return Object.keys(inputs).length > 0 ? inputs : null;
   }
