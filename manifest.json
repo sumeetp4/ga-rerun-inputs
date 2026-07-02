@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "GA: Re-run with Inputs",
+  "name": "Re-run with Inputs for GitHub Actions",
   "version": "1.0.0",
   "description": "Re-run GitHub Actions workflows and modify the inputs before triggering a new run.",
   "permissions": ["storage"],
@@ -20,7 +20,7 @@
   ],
   "action": {
     "default_popup": "popup.html",
-    "default_title": "GA: Re-run with Inputs",
+    "default_title": "Re-run with Inputs for GitHub Actions",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",

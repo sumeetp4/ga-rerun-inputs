@@ -1,7 +1,7 @@
 # Chrome Web Store Listing
 
 ## Name
-GA: Re-run with Inputs
+Re-run with Inputs for GitHub Actions
 
 ## Short Description (max 132 chars)
 Re-run any GitHub Actions workflow with pre-filled inputs from a previous run — modify what you need and trigger in one click.
