@@ -3,10 +3,12 @@
   "name": "GitHub Actions: Re-run with Inputs",
   "version": "1.0.0",
   "description": "Re-run GitHub Actions workflows and modify the inputs before triggering a new run.",
-  "permissions": ["storage", "cookies"],
+  "permissions": ["storage"],
   "host_permissions": [
     "https://github.com/*",
-    "https://api.github.com/*"
+    "https://api.github.com/*",
+    "https://*.actions.githubusercontent.com/*",
+    "https://*.blob.core.windows.net/*"
   ],
   "content_scripts": [
     {
@@ -19,5 +21,8 @@
   "action": {
     "default_popup": "popup.html",
     "default_title": "GitHub Actions: Re-run with Inputs"
+  },
+  "background": {
+    "service_worker": "background.js"
   }
 }
