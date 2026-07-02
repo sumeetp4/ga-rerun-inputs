@@ -32,7 +32,7 @@
     return res.status === 204 ? null : res.json();
   }
 
-  // Route fetches through background service worker to bypass CORS on log redirect URLs
+  // Route log fetches through background service worker to bypass CORS on redirect URLs
   function fetchViaBackground(url, headers = {}) {
     return new Promise((resolve, reject) => {
       chrome.runtime.sendMessage({ action: 'fetchText', url, headers }, res => {
@@ -46,74 +46,100 @@
   // Fetch YAML using GitHub session (no extra PAT scope needed)
   async function fetchYamlViaSession(owner, repo, branch, workflowPath) {
     const url = `https://github.com/${owner}/${repo}/raw/${branch}/${workflowPath}`;
-    console.log('[gh-rerun] Fetching YAML from:', url);
     const res = await fetch(url, { credentials: 'same-origin' });
     if (!res.ok) throw new Error(`HTTP ${res.status} fetching YAML`);
     return res.text();
   }
 
-  // Fetch job logs via background service worker (follows redirect to storage URL)
-  async function fetchJobLogs(owner, repo, jobId, tokenInfo) {
-    console.log('[gh-rerun] Fetching logs for job:', jobId);
+  // Fetch job logs via background service worker
+  function fetchJobLogs(owner, repo, jobId, tokenInfo) {
     return fetchViaBackground(
       `https://api.github.com/repos/${owner}/${repo}/actions/jobs/${jobId}/logs`,
-      {
-        'Authorization': `Bearer ${tokenInfo.token}`,
-        'Accept': 'application/vnd.github+json',
-      }
+      { 'Authorization': `Bearer ${tokenInfo.token}`, 'Accept': 'application/vnd.github+json' }
     );
   }
 
-  // Parse item_json from claim job logs
+  // Parse item_json from claim job logs (queue-based runs)
   function parseItemJsonFromLogs(logText) {
-    // Strip GitHub log timestamps: "2024-01-15T10:23:46.1234568Z "
     const clean = logText.replace(/\d{4}-\d{2}-\d{2}T[\d:.]+Z\s*/g, '');
-
-    // Try "item_json={...}" — written to GITHUB_OUTPUT or echoed to stdout
     let m = clean.match(/\bitem_json=({.+})/);
     if (m) { try { return JSON.parse(m[1]); } catch {} }
-
-    // Try "::set-output name=item_json::..." — old GitHub Actions syntax
     m = clean.match(/::set-output name=item_json::({.+})/);
     if (m) { try { return JSON.parse(m[1]); } catch {} }
-
-    // Try any JSON object containing "team" key (Python print output)
     for (const match of clean.matchAll(/({[^{}]{20,}})/g)) {
       if (match[1].includes('"team"')) {
         try { return JSON.parse(match[1]); } catch {}
       }
     }
-
     return null;
   }
 
-  // Extract workflow_dispatch inputs from the run page DOM.
-  // GitHub renders input values on the run page even though the REST API doesn't return them.
-  function extractInputsFromPageDOM() {
+  // Parse aligned "key         : value" lines from a "Print inputs" step in job logs.
+  // Filtering to valid keys happens at the call site using definedInputs from the YAML.
+  function parseInputsFromPrintStep(logText) {
+    const clean = logText.replace(/\d{4}-\d{2}-\d{2}T[\d:.]+Z\s*/g, '');
     const inputs = {};
-
-    // GitHub renders inputs in a definition list: <dt>key</dt><dd>value</dd>
-    const dts = document.querySelectorAll('dt');
-    for (const dt of dts) {
-      const key = dt.textContent.trim();
-      const dd = dt.nextElementSibling;
-      if (dd && dd.tagName === 'DD') {
-        inputs[key] = dd.textContent.trim();
-      }
+    for (const line of clean.split('\n')) {
+      const m = line.match(/^(\w[\w_]*)\s{2,}:\s*(.*)$/);
+      if (m) inputs[m[1].trim()] = m[2].trim();
     }
-    if (Object.keys(inputs).length > 0) {
-      console.log('[gh-rerun] Inputs from page DOM:', inputs);
-      return inputs;
-    }
-
-    // Fallback: look for key/value pairs in data attributes or summary sections
-    for (const el of document.querySelectorAll('[data-key], [data-input-name]')) {
-      const key = el.dataset.key || el.dataset.inputName;
-      const val = el.dataset.value || el.textContent.trim();
-      if (key) inputs[key] = val;
-    }
-
     return Object.keys(inputs).length > 0 ? inputs : null;
+  }
+
+  // Get actual run values from job logs.
+  // Note: GitHub's public REST and GraphQL APIs do not expose workflow_dispatch inputs
+  // from previous runs. Job logs are the only reliable source.
+  async function getActualRunValues(owner, repo, runId, tokenInfo) {
+    try {
+      const jobsData = await apiFetch(
+        `https://api.github.com/repos/${owner}/${repo}/actions/runs/${runId}/jobs?per_page=50`,
+        tokenInfo
+      );
+
+      // Source 1: reusable workflow job logs → "Print inputs" step
+      const reusableJob = jobsData.jobs.find(j => j.name.includes(' / '));
+      if (reusableJob) {
+        try {
+          const logs = await fetchJobLogs(owner, repo, reusableJob.id, tokenInfo);
+          const inputs = parseInputsFromPrintStep(logs);
+          if (inputs) return inputs;
+        } catch {}
+      }
+
+      // Source 2: claim job logs → item_json (queue-based runs)
+      const claimJob = jobsData.jobs.find(j => /^claim$/i.test(j.name));
+      if (claimJob) {
+        try {
+          const logs = await fetchJobLogs(owner, repo, claimJob.id, tokenInfo);
+          const itemJson = parseItemJsonFromLogs(logs);
+          if (itemJson) return itemJson;
+        } catch {}
+      }
+
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  // DOM fallback to get workflow file + branch when no PAT is available
+  function extractRunInfoFromDOM() {
+    let workflowFile = null;
+    for (const a of document.querySelectorAll('a[href]')) {
+      const m = a.pathname.match(/\/actions\/workflows\/([^/?#]+\.ya?ml)/i);
+      if (m) { workflowFile = m[1]; break; }
+    }
+    let branch = null;
+    for (const s of document.querySelectorAll('script[type="application/json"]')) {
+      try {
+        const text = s.textContent;
+        let m = text.match(/"headBranch"\s*:\s*"([^"]+)"/);
+        if (m) { branch = m[1]; break; }
+        m = text.match(/"head_branch"\s*:\s*"([^"]+)"/);
+        if (m) { branch = m[1]; break; }
+      } catch {}
+    }
+    return (workflowFile && branch) ? { workflowFile, branch } : null;
   }
 
   // Parse workflow_dispatch.inputs from YAML
@@ -175,86 +201,6 @@
       }
     }
     return inputs;
-  }
-
-  function parseInputsFromPrintStep(logText) {
-    const clean = logText.replace(/\d{4}-\d{2}-\d{2}T[\d:.]+Z\s*/g, '');
-
-    // Parse all aligned "key         : value" lines (2+ spaces before colon).
-    // Filtering to valid keys happens at the call site using definedInputs from the YAML.
-    const inputs = {};
-    for (const line of clean.split('\n')) {
-      const m = line.match(/^(\w[\w_]*)\s{2,}:\s*(.*)$/);
-      if (!m) continue;
-      inputs[m[1].trim()] = m[2].trim();
-    }
-    return Object.keys(inputs).length > 0 ? inputs : null;
-  }
-
-  // Get actual run values — tries multiple sources in order of reliability
-  async function getActualRunValues(owner, repo, runId, tokenInfo) {
-    try {
-      const jobsData = await apiFetch(
-        `https://api.github.com/repos/${owner}/${repo}/actions/runs/${runId}/jobs?per_page=50`,
-        tokenInfo
-      );
-      console.log('[gh-rerun] Jobs:', jobsData.jobs.map(j => `${j.id}: ${j.name}`));
-
-      // ── Source 1: run_leg job logs → "Print inputs" step ──────────────
-      // The reusable workflow prints all inputs as "key : value" lines.
-      // This works for both workflow_dispatch and cron/workflow_run triggered runs.
-      const reusableJob = jobsData.jobs.find(j => j.name.includes(' / '));
-      if (reusableJob) {
-        console.log('[gh-rerun] Fetching run_leg job logs, job ID:', reusableJob.id);
-        try {
-          const logs = await fetchJobLogs(owner, repo, reusableJob.id, tokenInfo);
-          const inputs = parseInputsFromPrintStep(logs);
-          console.log('[gh-rerun] Inputs from Print inputs step:', inputs);
-          if (inputs) return inputs;
-        } catch (e) {
-          console.warn('[gh-rerun] run_leg log fetch failed:', e.message);
-        }
-      }
-
-      // ── Source 2: claim job logs → item_json (queue-based fallback) ───
-      const claimJob = jobsData.jobs.find(j => /^claim$/i.test(j.name));
-      if (claimJob) {
-        console.log('[gh-rerun] Trying claim job logs, job ID:', claimJob.id);
-        try {
-          const logs = await fetchJobLogs(owner, repo, claimJob.id, tokenInfo);
-          const itemJson = parseItemJsonFromLogs(logs);
-          console.log('[gh-rerun] item_json from logs:', itemJson);
-          if (itemJson) return itemJson;
-        } catch (e) {
-          console.warn('[gh-rerun] claim log fetch failed:', e.message);
-        }
-      }
-
-      return null;
-    } catch (e) {
-      console.warn('[gh-rerun] Could not get run values:', e.message);
-      return null;
-    }
-  }
-
-  // DOM extraction fallback when no PAT
-  function extractRunInfoFromDOM() {
-    let workflowFile = null;
-    for (const a of document.querySelectorAll('a[href]')) {
-      const m = a.pathname.match(/\/actions\/workflows\/([^/?#]+\.ya?ml)/i);
-      if (m) { workflowFile = m[1]; break; }
-    }
-    let branch = null;
-    for (const s of document.querySelectorAll('script[type="application/json"]')) {
-      try {
-        const text = s.textContent;
-        let m = text.match(/"headBranch"\s*:\s*"([^"]+)"/);
-        if (m) { branch = m[1]; break; }
-        m = text.match(/"head_branch"\s*:\s*"([^"]+)"/);
-        if (m) { branch = m[1]; break; }
-      } catch {}
-    }
-    return (workflowFile && branch) ? { workflowFile, branch } : null;
   }
 
   function escapeHtml(str) {
@@ -411,7 +357,7 @@
       btn.innerHTML = `<span class="gh-rerun-spinner"></span> Loading…`;
 
       try {
-        // ── Step 1: get run metadata ────────────────────────────────────
+        // ── Step 1: get run metadata ────────────────────────────────────────
         let runMeta = null;
 
         if (tokenInfo.token) {
@@ -420,37 +366,28 @@
               `https://api.github.com/repos/${urlInfo.owner}/${urlInfo.repo}/actions/runs/${urlInfo.runId}`,
               tokenInfo
             );
-            console.log('[gh-rerun] Run event:', run.event, '| inputs:', run.inputs);
-            console.log('[gh-rerun] All run keys:', Object.keys(run));
-            // GitHub sometimes returns inputs at top level, sometimes nested
-            const runInputs = run.inputs ?? run.input ?? null;
-            console.log('[gh-rerun] Resolved runInputs:', runInputs);
             runMeta = {
               workflowId: run.workflow_id,
               workflowFile: null,
               branch: run.head_branch,
               event: run.event,
-              runInputs: runInputs || {},
+              runInputs: {},
             };
-          } catch (e) {
-            console.warn('[gh-rerun] API run fetch failed:', e.message);
-          }
+          } catch {}
         }
 
         if (!runMeta) {
           const dom = extractRunInfoFromDOM();
           if (dom) {
-            runMeta = {
-              workflowId: null, workflowFile: dom.workflowFile,
-              branch: dom.branch, event: 'workflow_dispatch', runInputs: {},
-            };
+            runMeta = { workflowId: null, workflowFile: dom.workflowFile,
+                        branch: dom.branch, event: 'workflow_dispatch', runInputs: {} };
           } else {
             alert('Could not determine workflow info. Please configure a PAT via the extension icon.');
             return;
           }
         }
 
-        // ── Step 2: get workflow file path ───────────────────────────────
+        // ── Step 2: get workflow file path ──────────────────────────────────
         let workflowPath = null;
         if (runMeta.workflowFile) {
           workflowPath = `.github/workflows/${runMeta.workflowFile}`;
@@ -462,57 +399,37 @@
             );
             workflowPath = wf.path;
             runMeta.workflowFile = workflowPath.split('/').pop();
-          } catch (e) {
-            console.warn('[gh-rerun] Could not get workflow path:', e.message);
-          }
+          } catch {}
         }
 
-        // ── Step 3: fetch YAML for input definitions + defaults ──────────
+        // ── Step 3: fetch YAML for input definitions + defaults ─────────────
         let definedInputs = null;
         let yamlFailed = false;
         if (workflowPath && runMeta.branch) {
           try {
             const yaml = await fetchYamlViaSession(urlInfo.owner, urlInfo.repo, runMeta.branch, workflowPath);
-            console.log('[gh-rerun] YAML (first 300 chars):', yaml.substring(0, 300));
             definedInputs = parseWorkflowDispatchInputs(yaml);
-            console.log('[gh-rerun] Defined inputs:', definedInputs);
-          } catch (e) {
-            console.warn('[gh-rerun] YAML fetch failed:', e.message);
+          } catch {
             yamlFailed = true;
           }
         } else {
           yamlFailed = true;
         }
 
-        // ── Step 4: get actual run values ────────────────────────────────
-        // run.inputs is populated for workflow_dispatch runs.
-        // For cron/workflow_run, fetch item_json from the claim job logs.
-        const hasRunInputs = Object.keys(runMeta.runInputs).length > 0;
-        if (!hasRunInputs) {
-          // Source 1: DOM — GitHub renders inputs on the run page even though the
-          // REST API doesn't return them. Instant, no extra API call needed.
-          const validKeys = new Set(Object.keys(definedInputs || {}));
-          const domValues = extractInputsFromPageDOM();
-          const filteredDom = domValues
-            ? Object.fromEntries(Object.entries(domValues).filter(([k]) => !validKeys.size || validKeys.has(k)))
-            : null;
-
-          if (filteredDom && Object.keys(filteredDom).length > 0) {
-            runMeta.runInputs = filteredDom;
-          } else if (tokenInfo.token) {
-            // Source 2: job logs (Print inputs step or claim item_json)
-            const rawValues = await getActualRunValues(
-              urlInfo.owner, urlInfo.repo, urlInfo.runId, tokenInfo
-            );
-            if (rawValues) {
-              runMeta.runInputs = validKeys.size
-                ? Object.fromEntries(Object.entries(rawValues).filter(([k]) => validKeys.has(k)))
-                : rawValues;
-            }
+        // ── Step 4: get actual run values from job logs ─────────────────────
+        // GitHub does not expose workflow_dispatch inputs through any public API
+        // (REST, GraphQL, or internal endpoints). Job logs are the only source.
+        if (tokenInfo.token) {
+          const rawValues = await getActualRunValues(urlInfo.owner, urlInfo.repo, urlInfo.runId, tokenInfo);
+          if (rawValues) {
+            const validKeys = new Set(Object.keys(definedInputs || {}));
+            runMeta.runInputs = validKeys.size
+              ? Object.fromEntries(Object.entries(rawValues).filter(([k]) => validKeys.has(k)))
+              : rawValues;
           }
         }
 
-        // ── Step 5: show modal ───────────────────────────────────────────
+        // ── Step 5: show modal ──────────────────────────────────────────────
         const workflowIdOrFile = runMeta.workflowFile || String(runMeta.workflowId);
 
         showModal({
