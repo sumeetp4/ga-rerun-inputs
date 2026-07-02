@@ -17,7 +17,7 @@
   async function apiFetch(url, tokenInfo, options = {}) {
     const headers = {
       'Accept': 'application/vnd.github+json',
-      'X-GitHub-Api-Version': '2022-11-28',
+      'X-GitHub-Api-Version': '2026-03-10',
       ...options.headers,
     };
     if (tokenInfo && tokenInfo.token) {
@@ -371,7 +371,7 @@
               workflowFile: null,
               branch: run.head_branch,
               event: run.event,
-              runInputs: {},
+              runInputs: run.inputs || {},
             };
           } catch {}
         }
