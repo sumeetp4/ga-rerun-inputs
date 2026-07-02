@@ -156,31 +156,20 @@
     bstack_os:       'bstack_os_version',
   };
 
-  // Whitelist of all valid input field names (after key mapping)
-  const KNOWN_INPUTS = new Set([
-    'platform', 'environment', 'marketplace', 'team', 'feature',
-    'test_case_filter', 'test_case_ids', 'jar_name', 'test_type',
-    'max_parallel', 'max_retry', 'store_results', 'slack_channel_name',
-    'is_rca_enabled', 'carousell_build_name', 'bstack_device_name',
-    'bstack_os_version', 'bstack_app_id', 'build_name', 'timeout_minutes',
-    'qa_infra_branch',
-  ]);
-
   function parseInputsFromPrintStep(logText) {
-    const inputs = {};
     const clean = logText.replace(/\d{4}-\d{2}-\d{2}T[\d:.]+Z\s*/g, '');
 
+    // Parse all aligned "key         : value" lines (2+ spaces before colon).
+    // Filtering to valid keys happens at the call site using definedInputs from the YAML.
+    const inputs = {};
     for (const line of clean.split('\n')) {
-      const m = line.match(/^([\w]+)\s*:\s*(.*)$/);
+      const m = line.match(/^(\w[\w_]*)\s{2,}:\s*(.*)$/);
       if (!m) continue;
       const rawKey = m[1].trim();
-      const key    = PRINT_INPUTS_KEY_MAP[rawKey] || rawKey;
-      if (!KNOWN_INPUTS.has(key)) continue; // ignore non-input lines
-      inputs[key]  = m[2].trim();
+      const key = PRINT_INPUTS_KEY_MAP[rawKey] || rawKey;
+      inputs[key] = m[2].trim();
     }
-
-    const coreFields = ['platform', 'environment', 'team', 'marketplace'];
-    return coreFields.some(f => f in inputs) ? inputs : null;
+    return Object.keys(inputs).length > 0 ? inputs : null;
   }
 
   // Get actual run values — tries multiple sources in order of reliability
@@ -481,10 +470,17 @@
         // For cron/workflow_run, fetch item_json from the claim job logs.
         const hasRunInputs = Object.keys(runMeta.runInputs).length > 0;
         if (!hasRunInputs && tokenInfo.token) {
-          const actualValues = await getActualRunValues(
+          const rawValues = await getActualRunValues(
             urlInfo.owner, urlInfo.repo, urlInfo.runId, tokenInfo
           );
-          if (actualValues) runMeta.runInputs = actualValues;
+          if (rawValues) {
+            // Filter to only keys defined in the workflow's workflow_dispatch.inputs —
+            // this removes noise from other log lines and works for any workflow.
+            const validKeys = new Set(Object.keys(definedInputs || {}));
+            runMeta.runInputs = validKeys.size
+              ? Object.fromEntries(Object.entries(rawValues).filter(([k]) => validKeys.has(k)))
+              : rawValues;
+          }
         }
 
         // ── Step 5: show modal ───────────────────────────────────────────
