@@ -87,6 +87,35 @@
     return null;
   }
 
+  // Extract workflow_dispatch inputs from the run page DOM.
+  // GitHub renders input values on the run page even though the REST API doesn't return them.
+  function extractInputsFromPageDOM() {
+    const inputs = {};
+
+    // GitHub renders inputs in a definition list: <dt>key</dt><dd>value</dd>
+    const dts = document.querySelectorAll('dt');
+    for (const dt of dts) {
+      const key = dt.textContent.trim();
+      const dd = dt.nextElementSibling;
+      if (dd && dd.tagName === 'DD') {
+        inputs[key] = dd.textContent.trim();
+      }
+    }
+    if (Object.keys(inputs).length > 0) {
+      console.log('[gh-rerun] Inputs from page DOM:', inputs);
+      return inputs;
+    }
+
+    // Fallback: look for key/value pairs in data attributes or summary sections
+    for (const el of document.querySelectorAll('[data-key], [data-input-name]')) {
+      const key = el.dataset.key || el.dataset.inputName;
+      const val = el.dataset.value || el.textContent.trim();
+      if (key) inputs[key] = val;
+    }
+
+    return Object.keys(inputs).length > 0 ? inputs : null;
+  }
+
   // Parse workflow_dispatch.inputs from YAML
   function parseWorkflowDispatchInputs(yaml) {
     const inputs = {};
@@ -459,17 +488,27 @@
         // run.inputs is populated for workflow_dispatch runs.
         // For cron/workflow_run, fetch item_json from the claim job logs.
         const hasRunInputs = Object.keys(runMeta.runInputs).length > 0;
-        if (!hasRunInputs && tokenInfo.token) {
-          const rawValues = await getActualRunValues(
-            urlInfo.owner, urlInfo.repo, urlInfo.runId, tokenInfo
-          );
-          if (rawValues) {
-            // Filter to only keys defined in the workflow's workflow_dispatch.inputs —
-            // this removes noise from other log lines and works for any workflow.
-            const validKeys = new Set(Object.keys(definedInputs || {}));
-            runMeta.runInputs = validKeys.size
-              ? Object.fromEntries(Object.entries(rawValues).filter(([k]) => validKeys.has(k)))
-              : rawValues;
+        if (!hasRunInputs) {
+          // Source 1: DOM — GitHub renders inputs on the run page even though the
+          // REST API doesn't return them. Instant, no extra API call needed.
+          const validKeys = new Set(Object.keys(definedInputs || {}));
+          const domValues = extractInputsFromPageDOM();
+          const filteredDom = domValues
+            ? Object.fromEntries(Object.entries(domValues).filter(([k]) => !validKeys.size || validKeys.has(k)))
+            : null;
+
+          if (filteredDom && Object.keys(filteredDom).length > 0) {
+            runMeta.runInputs = filteredDom;
+          } else if (tokenInfo.token) {
+            // Source 2: job logs (Print inputs step or claim item_json)
+            const rawValues = await getActualRunValues(
+              urlInfo.owner, urlInfo.repo, urlInfo.runId, tokenInfo
+            );
+            if (rawValues) {
+              runMeta.runInputs = validKeys.size
+                ? Object.fromEntries(Object.entries(rawValues).filter(([k]) => validKeys.has(k)))
+                : rawValues;
+            }
           }
         }
 
