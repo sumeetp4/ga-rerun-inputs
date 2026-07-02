@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Privacy Policy — GA: Re-run with Inputs</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      max-width: 720px;
+      margin: 48px auto;
+      padding: 0 24px;
+      color: #1f2328;
+      line-height: 1.6;
+    }
+    h1 { font-size: 24px; margin-bottom: 4px; }
+    h2 { font-size: 16px; margin-top: 32px; margin-bottom: 8px; }
+    p, li { font-size: 15px; color: #3d4146; }
+    ul { padding-left: 20px; }
+    li { margin-bottom: 4px; }
+    .updated { font-size: 13px; color: #656d76; margin-bottom: 32px; }
+    a { color: #0969da; }
+  </style>
+</head>
+<body>
+
+  <h1>Privacy Policy</h1>
+  <p class="updated">Last updated: July 2, 2026</p>
+
+  <p>
+    <strong>GA: Re-run with Inputs</strong> is a Chrome extension that adds a
+    "Re-run with new inputs" button to GitHub Actions run pages, allowing you to
+    re-trigger workflows with pre-filled and modified inputs.
+  </p>
+
+  <h2>Data We Collect</h2>
+  <p>We do not collect, transmit, or store any personal data on external servers. The extension operates entirely within your browser.</p>
+
+  <h2>Data Stored Locally</h2>
+  <p>The extension stores the following data in Chrome's local storage (<code>chrome.storage.local</code>) on your device only:</p>
+  <ul>
+    <li><strong>GitHub Personal Access Token (PAT)</strong> — optionally provided by you to authenticate with the GitHub API for private repositories. This token never leaves your browser and is never sent to any server other than <code>api.github.com</code>.</li>
+  </ul>
+  <p>This data remains on your device and is never shared with third parties. You can remove it at any time by clicking the extension icon and using the "Remove saved token" button.</p>
+
+  <h2>External Services</h2>
+  <p>The extension communicates only with the following services on your behalf:</p>
+  <ul>
+    <li><strong>github.com</strong> — to read workflow YAML files and job logs using your active GitHub session</li>
+    <li><strong>api.github.com</strong> — to fetch workflow run details and trigger new workflow runs using your PAT</li>
+    <li><strong>GitHub log storage</strong> (e.g. <code>*.actions.githubusercontent.com</code>) — to retrieve job log files for reading previous run inputs</li>
+  </ul>
+  <p>All requests are made directly from your browser to these services. No data passes through any intermediate server.</p>
+
+  <h2>Permissions</h2>
+  <p>The extension requests the following browser permissions:</p>
+  <ul>
+    <li><strong>storage</strong> — to save your PAT locally in Chrome</li>
+    <li><strong>Host access to github.com and api.github.com</strong> — to read workflow files and interact with the GitHub API</li>
+  </ul>
+
+  <h2>No Analytics or Tracking</h2>
+  <p>The extension contains no analytics, crash reporting, advertising, or any form of usage tracking.</p>
+
+  <h2>Changes to This Policy</h2>
+  <p>If this policy changes, the updated version will be published here with a new "Last updated" date.</p>
+
+  <h2>Contact</h2>
+  <p>For questions or concerns, please open an issue on the
+    <a href="https://github.com/carousell/qa-infra" target="_blank">project repository</a>.
+  </p>
+
+</body>
+</html>
