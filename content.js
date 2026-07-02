@@ -172,7 +172,7 @@
       console.log('[gh-rerun] Jobs:', jobsData.jobs.map(j => `${j.id}: ${j.name}`));
 
       // ── Source 1: run_leg job logs → "Print inputs" step ──────────────
-      // parallel-test-run.yml prints all inputs as "key : value" lines.
+      // The reusable workflow prints all inputs as "key : value" lines.
       // This works for both workflow_dispatch and cron/workflow_run triggered runs.
       const reusableJob = jobsData.jobs.find(j => j.name.includes(' / '));
       if (reusableJob) {
