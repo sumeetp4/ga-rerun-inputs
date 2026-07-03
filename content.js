@@ -80,7 +80,8 @@
     const clean = logText.replace(/\d{4}-\d{2}-\d{2}T[\d:.]+Z\s*/g, '');
     const inputs = {};
     for (const line of clean.split('\n')) {
-      const m = line.match(/^(\w[\w_]*)\s{2,}:\s*(.*)$/);
+      // \s+ handles both short keys (many spaces) and long keys like test_case_filter (1 space)
+      const m = line.match(/^(\w[\w_]*)\s+:\s*(.*)$/);
       if (m) inputs[m[1].trim()] = m[2].trim();
     }
     return Object.keys(inputs).length > 0 ? inputs : null;
